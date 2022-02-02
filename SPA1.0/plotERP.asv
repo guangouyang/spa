@@ -1,0 +1,78 @@
+function ERP_results = plotERP(EEG,cfg)
+
+epoch_twd = cfg.epoch_twd;
+base_twd = cfg.base_twd;
+
+%handling error
+for hand_e = 1:1
+    if ~isfield(cfg,'elec_indx')
+        ME = MException('a:b','No electrode(s) selected');
+        throw(ME)
+    end
+    if ~isfield(cfg,'marker_indx')
+        ME = MException('a:b','No marker(s) selected');
+        throw(ME)
+    end
+    if base_twd(1)< epoch_twd(1) || base_twd(2) > epoch_twd(2)
+        ME = MException('baseline:exceed', ...
+            'baseline window should not exceed epoch time window');
+        throw(ME)
+    end
+    if epoch_twd(1) > -100
+        ME = MException('epoch:window', ...
+            'left end of epoch time window should be <= 100 ms ');
+        throw(ME)
+    end
+end
+
+
+elec = cfg.elec_label(cfg.elec_indx);
+ch = find(ismember(lower({EEG.chanlocs.labels}),lower(elec)));
+ele_label = EEG.chanlocs(ch).labels;
+
+
+spa_or_not = {'',' (SPA)'};
+for m = 1:length(cfg.marker_indx)
+    markers{m} = cfg.marker_label(cfg.marker_indx(m));
+end
+
+EEG = SPA_ERP(EEG,cfg.threshold,markers,epoch_twd,base_twd);
+t_axis = EEG.t_axis;
+
+for data_type = 1:2
+    if data_type == 1 ST = EEG.ST;ERPs = EEG.ERPs;
+    else ST = EEG.ST_SPA;ERPs = EEG.ERPs_SPA;
+    end
+        
+
+
+figure('units','normalized','position',[.05,.05,.8,0.8]);
+ST_temp = {};aaa = [];
+for m = 1:length(cfg.marker_indx)
+    ST_temp{m} = squeeze(ST{m}(ch,:,:))';
+    aaa(end+1:end+length(ST_temp{m})) = ST_temp{m}(:);
+    ERP_temp(:,m) = ERPs(ch,:,m);
+end
+
+c_min = min(aaa(:));
+c_max = max(aaa(:));
+
+
+
+for m = 1:length(cfg.marker_indx)
+    
+    subplot(2,length(cfg.marker_indx),m);
+    imagesc(t_axis,1:size(ST{m},2),squeeze(ST{m}(ch,:,:))');colormap(jet);
+    caxis([c_min,c_max]);
+    lat_labels = cfg.marker_label(cfg.marker_indx(m));
+    ylabel('trials');
+    title(['single trials and ERPs',spa_or_not{data_type},' locked to ',lat_labels{1},...
+        ', from ',ele_label]);
+    subplot(2,length(cfg.marker_indx),m + length(cfg.marker_indx));
+    plot(t_axis,ERP_temp);
+    xlabel('time (ms)');ylabel('\muV');legend(markers);
+    axis tight;
+end
+
+
+end
